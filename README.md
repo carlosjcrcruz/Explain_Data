@@ -6,6 +6,7 @@ Aplicação FastAPI para transformar arquivos CSV em análises visuais, explicad
 
 - Upload validado de CSV (até 10 MB, 100 mil linhas e 200 colunas).
 - Prévia, tipos inferidos e diagnóstico inicial de valores ausentes.
+- Classificação opcional de dados sem rótulo por faixas numéricas, categorias ou texto.
 - Estatística descritiva, distribuição, correlação e sinalização preliminar de discrepantes.
 - Série temporal com agregação, média móvel, tendência e previsão linear opcional.
 - Classificação ou regressão com pipelines que evitam vazamento entre treino e teste.
@@ -13,6 +14,17 @@ Aplicação FastAPI para transformar arquivos CSV em análises visuais, explicad
 - Relatório visual imprimível com explicações, transformações e limitações.
 
 Os arquivos não são gravados no disco: os DataFrames ficam em memória enquanto o processo está ativo. A memória mantém no máximo 20 conjuntos; dados antigos são descartados automaticamente. Esta versão suporta apenas CSV e usa Plotly pelo CDN para gráficos interativos.
+
+### Dados sem classificação
+
+Arquivos tabulares não precisam possuir uma variável alvo para serem enviados ou analisados. Quando o usuário precisar criar rótulos, a interface permite definir uma nova coluna e regras transparentes:
+
+- faixa mínima e/ou máxima de uma coluna numérica;
+- correspondência com categorias selecionadas;
+- presença de texto, com comparação sem diferenciar maiúsculas por padrão;
+- rótulo padrão opcional para linhas não correspondidas.
+
+As regras são aplicadas na ordem e não sobrescrevem uma classificação anterior. O resultado é um novo dataset em memória; o upload original continua disponível e inalterado. Esta etapa não classifica automaticamente nem atribui significado aos registros sem regras explícitas do usuário.
 
 ## Executar
 
@@ -42,11 +54,4 @@ pytest -q
 - A API revalida colunas, intervalos, tipos e parâmetros.
 - Gráficos com séries grandes usam amostra ou redução declarada; métricas continuam usando o conjunto filtrado completo.
 
-## Limitações conhecidas
-
-- Não há autenticação nem isolamento multiusuário; para produção, é necessário um armazenamento por sessão/usuário.
-- Dados em memória são perdidos quando o servidor reinicia.
-- A previsão temporal é uma linha de tendência, útil como referência simples, não um modelo sazonal.
-- A impressão depende do recurso de PDF/impressora do navegador.
-- Fontes e Plotly são carregados por CDN; sem rede, o conteúdo textual e as tabelas funcionam, mas os gráficos podem não renderizar.
 

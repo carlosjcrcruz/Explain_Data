@@ -97,6 +97,119 @@ def test_descriptive_statistics_and_filter() -> None:
     assert body["numeric_summary"][0]["median"] == 2.5
 
 
+def test_classification_creates_derived_dataset_and_preserves_original() -> None:
+    identifier = upload_csv(
+        pd.DataFrame(
+            {
+                "pontuacao": [10, 45, 70, 95],
+                "descricao": ["comum", "cliente vip", "comum", "cliente VIP"],
+            }
+        )
+    )
+    response = client.post(
+        "/api/datasets/classify",
+        json={
+            "dataset_id": identifier,
+            "classification_column": "classe_usuario",
+            "rules": [
+                {
+                    "source_column": "pontuacao",
+                    "kind": "range",
+                    "label": "baixa",
+                    "maximum": 40,
+                },
+                {
+                    "source_column": "descricao",
+                    "kind": "contains",
+                    "label": "prioridade",
+                    "text": "vip",
+                },
+            ],
+            "default_label": "regular",
+        },
+    )
+    body = response.json()["data"]
+    assert response.status_code == 201
+    assert body["parent_dataset_id"] == identifier
+    assert body["classification"]["classified_rows"] == 4
+    assert body["classification"]["unclassified_rows"] == 0
+    assert body["preview"][0]["classe_usuario"] == "baixa"
+    assert body["preview"][1]["classe_usuario"] == "prioridade"
+    assert body["preview"][2]["classe_usuario"] == "regular"
+
+    original = client.post(
+        "/api/analyses/descriptive",
+        json={"dataset_id": identifier, "columns": ["classe_usuario"]},
+    )
+    derived = client.post(
+        "/api/analyses/descriptive",
+        json={"dataset_id": body["dataset_id"], "columns": ["classe_usuario"]},
+    )
+    assert original.status_code == 404
+    assert original.json()["error"]["code"] == "COLUMN_NOT_FOUND"
+    assert derived.status_code == 200
+
+
+def test_classification_reports_unmatched_rows() -> None:
+    identifier = upload_csv(pd.DataFrame({"grupo": ["A", "B", "C"]}))
+    response = client.post(
+        "/api/datasets/classify",
+        json={
+            "dataset_id": identifier,
+            "classification_column": "classe",
+            "rules": [
+                {
+                    "source_column": "grupo",
+                    "kind": "categories",
+                    "label": "selecionado",
+                    "values": ["A"],
+                }
+            ],
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["data"]["classification"]["unclassified_rows"] == 2
+    assert "permaneceram sem classificação" in response.json()["warnings"][0]
+
+
+def test_classification_rejects_existing_column_and_empty_result() -> None:
+    identifier = upload_csv(pd.DataFrame({"grupo": ["A", "B"]}))
+    existing = client.post(
+        "/api/datasets/classify",
+        json={
+            "dataset_id": identifier,
+            "classification_column": "grupo",
+            "rules": [
+                {
+                    "source_column": "grupo",
+                    "kind": "categories",
+                    "label": "x",
+                    "values": ["A"],
+                }
+            ],
+        },
+    )
+    unmatched = client.post(
+        "/api/datasets/classify",
+        json={
+            "dataset_id": identifier,
+            "classification_column": "classe",
+            "rules": [
+                {
+                    "source_column": "grupo",
+                    "kind": "contains",
+                    "label": "x",
+                    "text": "inexistente",
+                }
+            ],
+        },
+    )
+    assert existing.status_code == 400
+    assert existing.json()["error"]["code"] == "CLASSIFICATION_COLUMN_EXISTS"
+    assert unmatched.status_code == 400
+    assert unmatched.json()["error"]["code"] == "NO_ROWS_CLASSIFIED"
+
+
 def test_time_series_is_chronological_and_evaluated() -> None:
     dates = pd.date_range("2025-01-01", periods=20, freq="D")
     identifier = upload_csv(

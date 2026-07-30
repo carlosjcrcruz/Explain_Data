@@ -30,6 +30,8 @@ class Dataset:
     identifier: str
     original_name: str
     dataframe: pd.DataFrame
+    parent_identifier: str | None = None
+    transformations: tuple[str, ...] = ()
 
 
 class DatasetStore:
@@ -41,9 +43,21 @@ class DatasetStore:
         self._lock = RLock()
         self._max_datasets = max_datasets
 
-    def add(self, filename: str, dataframe: pd.DataFrame) -> Dataset:
+    def add(
+        self,
+        filename: str,
+        dataframe: pd.DataFrame,
+        parent_identifier: str | None = None,
+        transformations: tuple[str, ...] = (),
+    ) -> Dataset:
         identifier = uuid4().hex
-        dataset = Dataset(identifier, Path(filename).name, dataframe)
+        dataset = Dataset(
+            identifier,
+            Path(filename).name,
+            dataframe,
+            parent_identifier,
+            transformations,
+        )
         with self._lock:
             self._datasets[identifier] = dataset
             self._order.append(identifier)
@@ -172,17 +186,36 @@ def ingest_csv(filename: str, content: bytes) -> dict:
     if encoding != "utf-8":
         warnings.append(f"O arquivo foi lido usando a codificação {encoding}.")
 
-    return {
+    return dataset_payload(dataset, separator=separator, encoding=encoding) | {
+        "warnings": warnings,
+    }
+
+
+def dataset_payload(
+    dataset: Dataset,
+    *,
+    separator: str | None = None,
+    encoding: str | None = None,
+) -> dict:
+    """Return consistent metadata for uploaded and derived datasets."""
+
+    dataframe = dataset.dataframe
+    payload = {
         "dataset_id": dataset.identifier,
         "filename": dataset.original_name,
         "rows": len(dataframe),
         "columns_count": len(dataframe.columns),
-        "separator": "\\t" if separator == "\t" else separator,
-        "encoding": encoding,
         "columns": column_metadata(dataframe),
         "preview": records(dataframe.head(PREVIEW_ROWS)),
-        "warnings": warnings,
+        "parent_dataset_id": dataset.parent_identifier,
+        "transformations": list(dataset.transformations),
     }
+    if separator is not None:
+        payload["separator"] = "\\t" if separator == "\t" else separator
+    if encoding is not None:
+        payload["encoding"] = encoding
+    return payload
+
 
 
 def column_metadata(dataframe: pd.DataFrame) -> list[dict]:

@@ -150,6 +150,44 @@
               <div class="table-wrap"><table id="preview-table"></table></div>
             </section>
 
+            <section class="content-section classification-section">
+              <div class="section-title-row">
+                <div>
+                  <p class="section-kicker">CLASSIFICAÇÃO OPCIONAL</p>
+                  <h2>Adicionar rótulos aos registros</h2>
+                  <p>Use esta etapa quando o arquivo não possuir uma coluna de classe ou variável alvo. O sistema cria um dataset derivado e preserva o conjunto original.</p>
+                </div>
+                <button class="button button-secondary" id="toggle-classification" type="button" aria-expanded="false">Configurar classificação</button>
+              </div>
+              <div class="classification-help">
+                <strong>Quando utilizar</strong>
+                <span>Antes de treinar um modelo supervisionado ou quando os registros precisarem ser organizados em categorias definidas por você.</span>
+              </div>
+              <form id="classification-form" class="classification-form hidden">
+                <div class="classification-settings">
+                  <div class="field">
+                    <label for="classification-column">Nome da nova coluna</label>
+                    <input id="classification-column" type="text" maxlength="100" value="classe_usuario" required>
+                    <small>A coluna será adicionada somente ao dataset derivado.</small>
+                  </div>
+                  <div class="field">
+                    <label for="classification-default">Rótulo padrão</label>
+                    <input id="classification-default" type="text" maxlength="100" placeholder="Opcional: não classificado">
+                    <small>Aplicado às linhas que não corresponderem a nenhuma regra.</small>
+                  </div>
+                </div>
+                <div class="classification-rules-header">
+                  <div><strong>Regras de classificação</strong><small>As regras são aplicadas na ordem; a primeira correspondência é mantida.</small></div>
+                  <button class="button button-secondary button-compact" id="add-classification-rule" type="button">+ Adicionar regra</button>
+                </div>
+                <div id="classification-rules"></div>
+                <div class="form-actions">
+                  <p id="classification-status">Nenhuma alteração foi aplicada ao dataset.</p>
+                  <button class="button button-primary" type="submit">Gerar dataset classificado</button>
+                </div>
+              </form>
+            </section>
+
             <section class="content-section analysis-picker">
               <div class="section-title-row">
                 <div>

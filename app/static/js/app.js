@@ -6,6 +6,8 @@
     analysis: "descriptive",
     result: null,
     filters: [],
+    classificationRules: [],
+    originalDataset: null,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -34,7 +36,7 @@
   }
   function clearAlerts() { alertRegion.innerHTML = ""; }
 
-  function setStep(step) {
+  function setStep(step, { preserveScroll = false } = {}) {
     if (step === 2 && !state.dataset) {
       showAlerts("warning", "Envie um arquivo CSV antes de acessar a configuração.");
       return;
@@ -66,7 +68,9 @@
     activeNav?.classList.add("active");
     $("#sidebar").classList.remove("open");
     $("#menu-toggle").setAttribute("aria-expanded", "false");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!preserveScroll) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   async function api(path, options = {}) {
@@ -109,6 +113,8 @@
     try {
       const response = await api("/api/datasets/upload", { method: "POST", body: form });
       state.dataset = response.data;
+      state.originalDataset = response.data;
+      state.classificationRules = [];
       renderDataset();
       renderFields();
       if (response.warnings.length) showAlerts("warning", response.warnings);
@@ -125,7 +131,9 @@
   function renderDataset() {
     const data = state.dataset;
     $("#dataset-name").textContent = data.filename;
-    $("#dataset-meta").textContent = `${formatNumber(data.rows, 0)} linhas · ${data.columns_count} colunas · separador “${data.separator}”`;
+    const originText = data.parent_dataset_id ? " · dataset derivado" : "";
+    const separatorText = data.separator ? ` · separador “${data.separator}”` : "";
+    $("#dataset-meta").textContent = `${formatNumber(data.rows, 0)} linhas · ${data.columns_count} colunas${separatorText}${originText}`;
     const missing = data.columns.reduce((total, column) => total + column.missing, 0);
     $("#quality-chip").textContent = missing ? `${formatNumber(missing, 0)} células ausentes` : "Sem valores ausentes";
     $("#header-dataset-name").textContent = data.filename;
@@ -144,6 +152,25 @@
       return `<td${missingValue ? ' class="missing-value"' : ""}>${escapeHtml(missingValue ? "Ausente" : row[column.name])}</td>`;
     }).join("")}</tr>`).join("");
     $("#preview-table").innerHTML = `<thead><tr>${headers}</tr></thead><tbody>${rows}</tbody>`;
+    if (data.classification) {
+      $("#classification-status").innerHTML = `
+        <span>${formatNumber(data.classification.classified_rows, 0)} registros classificados em “${escapeHtml(data.classification.column)}”; ${formatNumber(data.classification.unclassified_rows, 0)} sem rótulo.</span>
+        <button class="button button-secondary button-compact" id="restore-original" type="button">Usar dataset original</button>`;
+      $("#classification-status").className = "classification-result";
+      $("#restore-original").addEventListener("click", () => {
+        state.dataset = state.originalDataset;
+        state.result = null;
+        state.classificationRules = [];
+        renderDataset();
+        renderFields();
+        renderClassificationRules();
+        $("#classification-status").textContent = "Dataset original restaurado para as próximas análises.";
+        $("#classification-status").className = "";
+      });
+    } else {
+      $("#classification-status").textContent = "Nenhuma alteração foi aplicada ao dataset.";
+      $("#classification-status").className = "";
+    }
   }
 
   function options(columns, selected = "") {
@@ -174,7 +201,7 @@
       html = `<div class="fields-grid">
         ${inputField("Tipo de problema", "problem-type", `<select id="problem-type"><option value="classification">Classificação</option><option value="regression">Regressão</option></select>`)}
         ${inputField("Modelo", "model", `<select id="model"></select>`, "A avaliação usa uma divisão reprodutível entre treino e teste.")}
-        ${inputField("Variável alvo", "target-column", `<select id="target-column" required><option value="">Selecione</option>${options(columns)}</select>`)}
+        ${inputField("Variável alvo", "target-column", `<select id="target-column" required><option value="">Selecione</option>${options(columns, state.dataset.classification?.column)}</select>`)}
         ${inputField("Percentual para teste", "test-size", `<select id="test-size"><option value=".2">20%</option><option value=".25">25%</option><option value=".3">30%</option></select>`)}
         ${inputField("Variáveis preditoras", "feature-columns", `<select id="feature-columns" multiple required>${options(columns)}</select>`, "Use Ctrl/Cmd para selecionar mais de uma variável.", true)}
       </div>`;
@@ -264,6 +291,124 @@
     }));
   }
 
+  function defaultClassificationRule() {
+    const column = state.dataset?.columns[0];
+    return {
+      source_column: column?.name || "",
+      kind: column?.kind === "numeric" ? "range" : "categories",
+      label: "",
+      minimum: "",
+      maximum: "",
+      values: [],
+      text: "",
+      case_sensitive: false,
+    };
+  }
+
+  function renderClassificationRules() {
+    const container = $("#classification-rules");
+    if (!container || !state.dataset) return;
+    if (!state.classificationRules.length) {
+      container.innerHTML = `<p class="empty-filters">Adicione ao menos uma regra para gerar a nova coluna.</p>`;
+      return;
+    }
+    container.innerHTML = state.classificationRules.map((rule, index) => {
+      const metadata = state.dataset.columns.find((column) => column.name === rule.source_column);
+      const categoryValues = metadata?.sample_values || [];
+      let criterion;
+      if (rule.kind === "range") {
+        criterion = `<div class="rule-criterion-range">
+          <input aria-label="Valor mínimo da regra ${index + 1}" data-classification-input="${index}" data-key="minimum" type="number" step="any" placeholder="Mínimo" value="${escapeHtml(rule.minimum)}">
+          <input aria-label="Valor máximo da regra ${index + 1}" data-classification-input="${index}" data-key="maximum" type="number" step="any" placeholder="Máximo" value="${escapeHtml(rule.maximum)}">
+        </div>`;
+      } else if (rule.kind === "categories" && categoryValues.length) {
+        criterion = `<select aria-label="Categorias da regra ${index + 1}" data-classification-values="${index}" multiple>${categoryValues.map((value) => `<option value="${escapeHtml(value)}"${rule.values.includes(value) ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>`;
+      } else if (rule.kind === "categories") {
+        criterion = `<input aria-label="Categorias da regra ${index + 1}" data-classification-input="${index}" data-key="valuesText" type="text" placeholder="Separe categorias por vírgula" value="${escapeHtml(rule.values.join(", "))}">`;
+      } else {
+        criterion = `<input aria-label="Texto da regra ${index + 1}" data-classification-input="${index}" data-key="text" type="text" placeholder="Texto contido na coluna" value="${escapeHtml(rule.text)}">`;
+      }
+      return `<div class="classification-rule">
+        <div class="field">
+          <label for="classification-source-${index}">Coluna de origem</label>
+          <select id="classification-source-${index}" data-classification-source="${index}">${options(state.dataset.columns, rule.source_column)}</select>
+        </div>
+        <div class="field">
+          <label for="classification-kind-${index}">Critério</label>
+          <select id="classification-kind-${index}" data-classification-kind="${index}">
+            <option value="range"${rule.kind === "range" ? " selected" : ""}>Faixa numérica</option>
+            <option value="categories"${rule.kind === "categories" ? " selected" : ""}>Categorias</option>
+            <option value="contains"${rule.kind === "contains" ? " selected" : ""}>Texto contém</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Valores correspondentes</label>
+          ${criterion}
+        </div>
+        <div class="field">
+          <label for="classification-label-${index}">Rótulo atribuído</label>
+          <input id="classification-label-${index}" data-classification-input="${index}" data-key="label" type="text" maxlength="100" placeholder="Ex.: alta prioridade" value="${escapeHtml(rule.label)}" required>
+        </div>
+        <button class="icon-button" type="button" data-remove-classification-rule="${index}" aria-label="Remover regra ${index + 1}">×</button>
+      </div>`;
+    }).join("");
+
+    $$("[data-classification-source]").forEach((element) => element.addEventListener("change", () => {
+      const index = Number(element.dataset.classificationSource);
+      const metadata = state.dataset.columns.find((column) => column.name === element.value);
+      state.classificationRules[index] = {
+        ...defaultClassificationRule(),
+        source_column: element.value,
+        kind: metadata?.kind === "numeric" ? "range" : "categories",
+        label: state.classificationRules[index].label,
+      };
+      renderClassificationRules();
+    }));
+    $$("[data-classification-kind]").forEach((element) => element.addEventListener("change", () => {
+      const rule = state.classificationRules[Number(element.dataset.classificationKind)];
+      rule.kind = element.value;
+      rule.minimum = "";
+      rule.maximum = "";
+      rule.values = [];
+      rule.text = "";
+      renderClassificationRules();
+    }));
+    $$("[data-classification-input]").forEach((element) => element.addEventListener("input", () => {
+      const rule = state.classificationRules[Number(element.dataset.classificationInput)];
+      if (element.dataset.key === "valuesText") {
+        rule.values = element.value.split(",").map((value) => value.trim()).filter(Boolean);
+      } else {
+        rule[element.dataset.key] = element.value;
+      }
+    }));
+    $$("[data-classification-values]").forEach((element) => element.addEventListener("change", () => {
+      state.classificationRules[Number(element.dataset.classificationValues)].values =
+        [...element.selectedOptions].map((option) => option.value);
+    }));
+    $$("[data-remove-classification-rule]").forEach((element) => element.addEventListener("click", () => {
+      state.classificationRules.splice(Number(element.dataset.removeClassificationRule), 1);
+      renderClassificationRules();
+    }));
+  }
+
+  function classificationPayload() {
+    return {
+      dataset_id: state.dataset.dataset_id,
+      classification_column: $("#classification-column").value.trim(),
+      default_label: $("#classification-default").value.trim() || null,
+      rules: state.classificationRules.map((rule) => ({
+        source_column: rule.source_column,
+        kind: rule.kind,
+        label: rule.label.trim(),
+        minimum: rule.minimum === "" ? null : Number(rule.minimum),
+        maximum: rule.maximum === "" ? null : Number(rule.maximum),
+        values: rule.values,
+        text: rule.text || null,
+        case_sensitive: rule.case_sensitive,
+      })),
+    };
+  }
+
   function activateAnalysis(analysis) {
     if (state.analysis !== analysis) state.result = null;
     state.analysis = analysis;
@@ -274,7 +419,7 @@
     });
     renderFields();
     if (state.dataset) {
-      setStep(2);
+      setStep(2, { preserveScroll: true });
       $$(".nav-item").forEach((item) => item.classList.remove("active"));
       $(`[data-nav-analysis="${analysis}"]`)?.classList.add("active");
     }
@@ -492,6 +637,8 @@
     state.dataset = null;
     state.result = null;
     state.filters = [];
+    state.classificationRules = [];
+    state.originalDataset = null;
     fileInput.value = "";
     clearAlerts();
     dropzone.classList.remove("hidden");
@@ -500,6 +647,9 @@
     $("#header-change-file").classList.add("hidden");
     $("#processing-status").className = "processing-status";
     $("#processing-status").innerHTML = "<i></i> Aguardando arquivo";
+    $("#classification-form").classList.add("hidden");
+    $("#toggle-classification").setAttribute("aria-expanded", "false");
+    $("#toggle-classification").textContent = "Configurar classificação";
     setStep(1);
   }
 
@@ -521,6 +671,62 @@
   $("#menu-toggle").addEventListener("click", () => {
     const open = $("#sidebar").classList.toggle("open");
     $("#menu-toggle").setAttribute("aria-expanded", String(open));
+  });
+  $("#toggle-classification").addEventListener("click", () => {
+    const form = $("#classification-form");
+    const willOpen = form.classList.contains("hidden");
+    form.classList.toggle("hidden", !willOpen);
+    $("#toggle-classification").setAttribute("aria-expanded", String(willOpen));
+    $("#toggle-classification").textContent = willOpen ? "Fechar configuração" : "Configurar classificação";
+    if (willOpen && !state.classificationRules.length) {
+      state.classificationRules.push(defaultClassificationRule());
+    }
+    if (willOpen) renderClassificationRules();
+  });
+  $("#add-classification-rule").addEventListener("click", () => {
+    if (state.classificationRules.length >= 20) {
+      showAlerts("warning", "Use no máximo 20 regras de classificação pela interface.");
+      return;
+    }
+    state.classificationRules.push(defaultClassificationRule());
+    renderClassificationRules();
+  });
+  $("#classification-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearAlerts();
+    if (!state.classificationRules.length) {
+      showAlerts("error", "Adicione ao menos uma regra de classificação.");
+      return;
+    }
+    const button = event.submitter;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Classificando registros...";
+    $("#processing-status").className = "processing-status";
+    $("#processing-status").innerHTML = `<i></i> Classificando ${formatNumber(state.dataset.rows, 0)} registros`;
+    try {
+      const response = await api("/api/datasets/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(classificationPayload()),
+      });
+      state.dataset = response.data;
+      state.result = null;
+      renderDataset();
+      renderFields();
+      renderClassificationRules();
+      const messages = [response.message, ...response.warnings];
+      showAlerts(response.warnings.length ? "warning" : "success", messages);
+      $("#processing-status").className = "processing-status ready";
+      $("#processing-status").innerHTML = "<i></i> Dataset classificado";
+    } catch (error) {
+      showAlerts("error", error.message);
+      $("#processing-status").className = "processing-status";
+      $("#processing-status").innerHTML = "<i></i> Falha na classificação";
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
   });
   $("#sample-button").addEventListener("click", () => {
     const csv = "mes,receita,custos,canal\\n2026-01-01,68000,41000,Online\\n2026-02-01,72000,43500,Parceiros\\n2026-03-01,76500,44800,Online\\n2026-04-01,80300,46200,Loja\\n2026-05-01,89200,48900,Online\\n2026-06-01,96400,51200,Parceiros\\n2026-07-01,101500,53400,Online\\n2026-08-01,108900,55700,Loja\\n2026-09-01,114300,57600,Online\\n2026-10-01,121000,60100,Parceiros\\n2026-11-01,129800,62600,Online\\n2026-12-01,138400,65500,Loja";
