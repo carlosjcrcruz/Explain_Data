@@ -458,28 +458,43 @@ Evitar:
 
 ### Cores dos gráficos
 
-A série principal deve usar azul.
+A identidade dos gráficos deve usar fundo branco e elementos visuais em azul ou tons derivados da paleta principal.
 
-Sugestão de sequência:
+Sequência permitida:
 
 ```text
 #2563EB
-#0B0D10
-#60A5FA
-#64748B
 #1D4ED8
-#94A3B8
+#60A5FA
+#1E40AF
+#93C5FD
+#3B82F6
 ```
 
-Utilizar vermelho apenas para erro, queda relevante ou classe negativa. Utilizar verde apenas para sucesso, aumento ou classe positiva.
+Não utilizar preto como cor principal dentro dos gráficos. Diferenciar séries por tons de azul, espessura, marcadores e padrões de linha.
+
+Todo texto interno do gráfico deve ser azul (`#2563EB`). Essa regra inclui:
+
+- Títulos e subtítulos;
+- Nomes dos eixos;
+- Valores e marcações dos eixos;
+- Legendas;
+- Anotações e valores exibidos sobre os dados;
+- Escalas e barras de cor;
+- Tooltips e rótulos de hover;
+- Seletores, controles e botões da biblioteca de gráficos.
+
+É proibido utilizar texto preto dentro dos gráficos, inclusive em tooltips, menus ou elementos criados automaticamente pela biblioteca.
 
 ### Fundo
 
-- Fundo do gráfico: branco;
-- Linhas de grade: `#E5E7EB`;
-- Texto dos eixos: `#4B5563`;
-- Linha principal: azul;
-- Marcadores: pequenos e discretos.
+- Fundo do gráfico e da área de plotagem: branco `#FFFFFF`;
+- Linhas de grade: azul muito claro `#DBEAFE`;
+- Texto dos eixos: azul `#2563EB`;
+- Linha principal: azul `#2563EB`;
+- Linhas secundárias: outros tons de azul;
+- Marcadores: azuis, pequenos e discretos;
+- Tooltips: fundo branco, borda azul e texto azul.
 
 ---
 
@@ -544,7 +559,7 @@ Exibir histograma com seletor de variável.
 
 ### Correlação
 
-Utilizar matriz com escala azul, branco e preto.
+Utilizar matriz com escala branco, azul claro e azul principal. Todos os textos, valores, nomes e tooltips da matriz devem permanecer azuis.
 
 ### Texto interpretativo
 

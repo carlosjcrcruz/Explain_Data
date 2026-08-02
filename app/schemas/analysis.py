@@ -28,6 +28,40 @@ class DescriptiveRequest(AnalysisBase):
     """Descriptive analysis parameters."""
 
     columns: list[str] = Field(default_factory=list, max_length=50)
+    metrics: list[
+        Literal[
+            "count",
+            "missing",
+            "unique",
+            "mean",
+            "median",
+            "mode",
+            "std",
+            "variance",
+            "min_max",
+            "quartiles",
+            "outliers",
+        ]
+    ] = Field(
+        default_factory=lambda: [
+            "count",
+            "missing",
+            "unique",
+            "mean",
+            "median",
+            "mode",
+            "std",
+            "variance",
+            "min_max",
+            "quartiles",
+            "outliers",
+        ],
+        min_length=1,
+        max_length=11,
+    )
+    include_histograms: bool = True
+    include_correlations: bool = True
+    include_missing_chart: bool = True
 
 
 class TimeSeriesRequest(AnalysisBase):
@@ -68,4 +102,3 @@ class ClusteringRequest(AnalysisBase):
 
     feature_columns: list[str] = Field(min_length=2, max_length=20)
     n_clusters: int = Field(default=3, ge=2, le=10)
-

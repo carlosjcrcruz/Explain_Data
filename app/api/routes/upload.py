@@ -6,7 +6,7 @@ from app.core.config import MAX_UPLOAD_BYTES
 from app.schemas.datasets import ClassificationRequest
 from app.schemas.responses import success_response
 from app.services.classification_service import classify
-from app.services.dataset_service import ingest_csv
+from app.services.dataset_service import dataset_payload, ingest_csv, store
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -34,4 +34,15 @@ def classify_dataset(request: ClassificationRequest) -> dict:
         "Dataset classificado sem alterar o arquivo original.",
         result,
         warnings,
+    )
+
+
+@router.get("/{dataset_id}")
+def get_dataset(dataset_id: str) -> dict:
+    """Return safe metadata and preview for an in-memory dataset."""
+
+    dataset = store.get(dataset_id)
+    return success_response(
+        "Metadados do conjunto de dados carregados.",
+        dataset_payload(dataset),
     )

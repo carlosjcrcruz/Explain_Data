@@ -94,3 +94,7 @@ def health() -> dict[str, str]:
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
+
+@app.get("/descriptive", include_in_schema=False)
+def descriptive_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "descriptive.html")

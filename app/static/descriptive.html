@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Configure e execute estatística descritiva sobre o conjunto de dados carregado.">
+  <title>Estatística descritiva — Explica Dados</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260802-5">
+  <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" defer></script>
+  <script src="/static/js/descriptive.js?v=20260802-5" defer></script>
+</head>
+<body class="descriptive-page">
+  <a class="skip-link" href="#descriptive-main">Pular para o conteúdo principal</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação da análise">
+      <a class="sidebar-brand" id="sidebar-home" href="/">
+        <span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>EXPLICA DADOS</span>
+      </a>
+      <nav class="sidebar-nav">
+        <p class="nav-label">NAVEGAÇÃO</p>
+        <a class="nav-item" id="back-to-dataset" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>Voltar ao conjunto</span>
+        </a>
+        <a class="nav-item active" href="#configuration">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"/></svg>
+          <span>Estatística descritiva</span>
+        </a>
+        <a class="nav-item" href="#data-types">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M9 5v14"/></svg>
+          <span>Tipos de dados</span>
+        </a>
+        <a class="nav-item" href="#descriptive-results">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM14 3v4h4M9 12h6m-6 4h6"/></svg>
+          <span>Resultados</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><strong>Dataset em memória</strong><small>O original permanece preservado</small></div>
+      </div>
+    </aside>
+
+    <div class="app-column">
+      <header class="app-header">
+        <div class="active-dataset">
+          <strong id="descriptive-dataset-name">Carregando dataset...</strong>
+          <span id="descriptive-dataset-meta"></span>
+        </div>
+        <div class="header-actions">
+          <span class="processing-status" id="descriptive-status"><i></i> Carregando</span>
+          <a class="button button-secondary button-compact" id="header-back" href="/">Voltar</a>
+        </div>
+      </header>
+
+      <main id="descriptive-main" class="main-content descriptive-content">
+        <section class="page-heading">
+          <div>
+            <p class="breadcrumb">ANÁLISES / ESTATÍSTICA DESCRITIVA</p>
+            <h1>Configurar análise descritiva</h1>
+            <p>Selecione as colunas, as medidas estatísticas e as visualizações que devem fazer parte do resultado.</p>
+          </div>
+        </section>
+
+        <div id="descriptive-alerts" class="alert-region standalone-alerts" aria-live="polite"></div>
+
+        <section id="data-types" class="workspace-section data-types-section">
+          <div class="panel">
+            <div class="section-title-row">
+              <div>
+                <p class="section-kicker">ESTRUTURA DO ARQUIVO</p>
+                <h2>Tipos de dados identificados</h2>
+                <p>A identificação é inicial. Colunas marcadas como possíveis datas serão validadas quando usadas em uma análise temporal.</p>
+              </div>
+            </div>
+            <div class="type-summary" id="type-summary"></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Coluna</th><th>Tipo identificado</th><th>Tipo técnico</th><th>Valores únicos</th><th>Ausentes</th><th>Faixa ou exemplos</th></tr></thead>
+                <tbody id="data-types-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div class="descriptive-layout">
+          <aside id="configuration" class="analysis-configuration">
+            <form id="descriptive-form">
+              <section class="configuration-block">
+                <p class="section-kicker">1. COLUNAS</p>
+                <h2>Escolha o que analisar</h2>
+                <p>Colunas numéricas são selecionadas inicialmente.</p>
+                <div class="selection-actions">
+                  <button type="button" class="text-action" id="select-numeric">Selecionar numéricas</button>
+                  <button type="button" class="text-action" id="select-all-columns">Selecionar todas</button>
+                  <button type="button" class="text-action" id="clear-columns">Limpar</button>
+                </div>
+                <div id="column-options" class="checkbox-list"></div>
+              </section>
+
+              <section class="configuration-block">
+                <p class="section-kicker">2. MÉTRICAS</p>
+                <h2>Defina as medidas</h2>
+                <p>É possível combinar várias medidas na mesma execução.</p>
+                <div class="metric-options" id="metric-options">
+                  <label><input type="checkbox" name="metric" value="count" checked><span><strong>Contagem</strong><small>Quantidade de valores válidos.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="missing" checked><span><strong>Valores ausentes</strong><small>Quantidade sem preenchimento.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="unique"><span><strong>Valores únicos</strong><small>Diversidade observada na coluna.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="mean" checked><span><strong>Média</strong><small>Soma dividida pela quantidade.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="median" checked><span><strong>Mediana</strong><small>Valor central após ordenação.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="mode" checked><span><strong>Moda</strong><small>Valor que aparece com maior frequência.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="std"><span><strong>Desvio padrão</strong><small>Dispersão em torno da média.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="variance"><span><strong>Variância</strong><small>Dispersão ao quadrado.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="min_max" checked><span><strong>Mínimo e máximo</strong><small>Extremos observados.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="quartiles"><span><strong>Quartis</strong><small>Q1 e Q3 da distribuição.</small></span></label>
+                  <label><input type="checkbox" name="metric" value="outliers"><span><strong>Valores discrepantes</strong><small>Regra de 1,5 × IQR.</small></span></label>
+                </div>
+              </section>
+
+              <section class="configuration-block">
+                <p class="section-kicker">3. VISUALIZAÇÕES</p>
+                <h2>Escolha os gráficos</h2>
+                <div class="visual-options">
+                  <label><input id="include-histograms" type="checkbox" checked><span>Histogramas das colunas numéricas</span></label>
+                  <label><input id="include-correlations" type="checkbox" checked><span>Matriz de correlação</span></label>
+                  <label><input id="include-missing" type="checkbox" checked><span>Gráfico de valores ausentes</span></label>
+                </div>
+              </section>
+
+              <button class="button button-primary full-width" type="submit">Executar análise descritiva</button>
+            </form>
+          </aside>
+
+          <section id="descriptive-results" class="descriptive-results">
+            <div class="empty-result" id="empty-result">
+              <strong>Nenhuma análise executada</strong>
+              <p>Configure as colunas e as métricas ao lado. Os resultados serão exibidos nesta área.</p>
+            </div>
+            <div id="descriptive-result-content" class="hidden"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

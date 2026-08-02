@@ -605,8 +605,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .chart {
   width: 100%;
   min-height: 480px;
-  border: 1px solid var(--color-border);
-  background: white;
+  border: 1px solid #93c5fd;
+  background: #ffffff;
 }
 .interpretation-list, .warning-list {
   max-width: 960px;
@@ -682,4 +682,167 @@ tbody tr:last-child td { border-bottom: 0; }
   .panel { padding: 0; }
   #result-panel { display: block !important; }
   .chart { min-height: 360px; }
+}
+
+/* Dedicated descriptive analysis page */
+.descriptive-content { max-width: 1800px; }
+.standalone-alerts { padding: 0; margin-bottom: var(--space-4); }
+.data-types-section { margin-bottom: var(--space-5); }
+.type-summary {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.type-summary-item {
+  min-width: 130px;
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  border-right: 1px solid var(--color-border);
+}
+.type-summary-item:last-child { border-right: 0; }
+.type-summary-item small { display: block; color: var(--color-text-secondary); font-size: 11px; }
+.type-summary-item strong { font-size: 22px; }
+.data-kind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.data-kind.numeric { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.data-kind.categorical { border-color: #cbd5e1; background: #f8fafc; color: #334155; }
+.data-kind.date_candidate { border-color: #bfdbfe; background: #eaf2ff; color: #1e40af; }
+.descriptive-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+.analysis-configuration {
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-4));
+  max-height: calc(100vh - var(--header-height) - var(--space-6));
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  background: white;
+}
+.analysis-configuration form { padding: var(--space-4); }
+.configuration-block {
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-divider);
+}
+.configuration-block h2 { margin: 2px 0 var(--space-1); font-size: 16px; }
+.configuration-block > p:not(.section-kicker) { margin-bottom: var(--space-3); color: var(--color-text-secondary); font-size: 12px; }
+.selection-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.text-action {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.checkbox-list {
+  max-height: 245px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+}
+.checkbox-list label,
+.metric-options label,
+.visual-options label {
+  min-height: 40px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 9px var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+  cursor: pointer;
+}
+.checkbox-list label:last-child,
+.metric-options label:last-child,
+.visual-options label:last-child { border-bottom: 0; }
+.checkbox-list label:hover,
+.metric-options label:hover,
+.visual-options label:hover { background: var(--color-primary-soft); }
+.checkbox-list input,
+.metric-options input,
+.visual-options input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--color-primary);
+}
+.checkbox-list label > span,
+.metric-options label > span { min-width: 0; display: flex; flex-direction: column; }
+.checkbox-list strong,
+.metric-options strong { font-size: 12px; }
+.checkbox-list small,
+.metric-options small { color: var(--color-text-muted); font-size: 11px; }
+.metric-options, .visual-options { border: 1px solid var(--color-border); }
+.full-width { width: 100%; }
+.descriptive-results {
+  min-height: 520px;
+  border: 1px solid var(--color-border);
+  background: white;
+}
+.empty-result {
+  min-height: 520px;
+  display: grid;
+  place-content: center;
+  padding: var(--space-6);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+.empty-result strong { color: var(--color-text); font-size: 16px; }
+.empty-result p { max-width: 430px; margin: var(--space-2) 0 0; }
+#descriptive-result-content { padding: var(--space-5); }
+.result-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-text);
+}
+.result-heading h2 { margin: 2px 0 0; font-size: 22px; }
+.result-heading p { margin: 0; color: var(--color-text-secondary); font-size: 12px; }
+.descriptive-chart {
+  width: 100%;
+  min-height: 480px;
+  background: #ffffff;
+  border: 1px solid #93c5fd;
+}
+.result-section { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-divider); }
+.result-section h3 { margin-bottom: var(--space-3); font-size: 16px; }
+.result-section > p { color: var(--color-text-secondary); font-size: 12px; }
+.categorical-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.categorical-table { border: 1px solid var(--color-border); }
+.categorical-table h4 { margin: 0; padding: var(--space-3); border-bottom: 1px solid var(--color-border); font-size: 13px; }
+
+@media (max-width: 1180px) {
+  .descriptive-layout { grid-template-columns: 1fr; }
+  .analysis-configuration { position: static; max-height: none; }
+  .analysis-configuration form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .configuration-block { margin: 0; }
+  .analysis-configuration .full-width { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .type-summary { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .type-summary-item { border-bottom: 1px solid var(--color-border); }
+  .analysis-configuration form { grid-template-columns: 1fr; }
+  .analysis-configuration .full-width { grid-column: auto; }
+  .categorical-tables { grid-template-columns: 1fr; }
+  .result-heading { align-items: flex-start; flex-direction: column; }
+  #descriptive-result-content { padding: var(--space-4) var(--space-3); }
+  .descriptive-chart { min-height: 360px; }
 }

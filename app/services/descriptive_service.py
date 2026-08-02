@@ -30,6 +30,7 @@ def analyze(request: DescriptiveRequest) -> tuple[dict, list[str]]:
     numeric = selected.select_dtypes(include="number")
     categorical = selected.select_dtypes(exclude="number")
     warnings = list(filter_messages)
+    requested_metrics = set(request.metrics)
 
     summary: list[dict] = []
     for column in numeric.columns:
@@ -40,42 +41,56 @@ def analyze(request: DescriptiveRequest) -> tuple[dict, list[str]]:
         iqr = q3 - q1
         outliers = int(((series < q1 - 1.5 * iqr) | (series > q3 + 1.5 * iqr)).sum())
         modes = series.mode()
-        summary.append(
-            {
-                "column": column,
-                "count": int(series.count()),
-                "missing": int(selected[column].isna().sum()),
-                "mean": _finite(series.mean()),
-                "median": _finite(median),
-                "mode": _finite(modes.iloc[0]) if not modes.empty else None,
-                "std": _finite(series.std()),
-                "variance": _finite(series.var()),
-                "minimum": _finite(series.min()),
-                "q1": _finite(q1),
-                "q3": _finite(q3),
-                "maximum": _finite(series.max()),
-                "outliers_iqr": outliers,
-            }
-        )
+        values = {
+            "count": int(series.count()),
+            "missing": int(selected[column].isna().sum()),
+            "unique": int(series.nunique()),
+            "mean": _finite(series.mean()),
+            "median": _finite(median),
+            "mode": _finite(modes.iloc[0]) if not modes.empty else None,
+            "std": _finite(series.std()),
+            "variance": _finite(series.var()),
+            "minimum": _finite(series.min()),
+            "q1": _finite(q1),
+            "q3": _finite(q3),
+            "maximum": _finite(series.max()),
+            "outliers_iqr": outliers,
+        }
+        row = {"column": column}
+        for metric in ("count", "missing", "unique", "mean", "median", "mode", "std", "variance"):
+            if metric in requested_metrics:
+                row[metric] = values[metric]
+        if "min_max" in requested_metrics:
+            row["minimum"] = values["minimum"]
+            row["maximum"] = values["maximum"]
+        if "quartiles" in requested_metrics:
+            row["q1"] = values["q1"]
+            row["q3"] = values["q3"]
+        if "outliers" in requested_metrics:
+            row["outliers_iqr"] = values["outliers_iqr"]
+        summary.append(row)
 
     categorical_summary: list[dict] = []
     for column in categorical.columns:
         series = categorical[column]
         counts = series.astype("string").fillna("Ausente").value_counts().head(10)
         mode = series.mode(dropna=True)
-        categorical_summary.append(
-            {
-                "column": column,
-                "count": int(series.notna().sum()),
-                "missing": int(series.isna().sum()),
-                "unique": int(series.nunique(dropna=True)),
-                "mode": str(mode.iloc[0]) if not mode.empty else None,
-                "top_values": [
-                    {"value": str(key), "count": int(value)}
-                    for key, value in counts.items()
-                ],
-            }
-        )
+        row = {
+            "column": column,
+            "top_values": [
+                {"value": str(key), "count": int(value)}
+                for key, value in counts.items()
+            ],
+        }
+        if "count" in requested_metrics:
+            row["count"] = int(series.notna().sum())
+        if "missing" in requested_metrics:
+            row["missing"] = int(series.isna().sum())
+        if "unique" in requested_metrics:
+            row["unique"] = int(series.nunique(dropna=True))
+        if "mode" in requested_metrics:
+            row["mode"] = str(mode.iloc[0]) if not mode.empty else None
+        categorical_summary.append(row)
 
     missing = [
         {
@@ -87,12 +102,13 @@ def analyze(request: DescriptiveRequest) -> tuple[dict, list[str]]:
     ]
     correlations = (
         records(numeric.corr().reset_index(names="column"))
-        if len(numeric.columns) >= 2
+        if request.include_correlations and len(numeric.columns) >= 2
         else []
     )
 
     histograms = []
-    for column in numeric.columns[:8]:
+    histogram_columns = numeric.columns[:8] if request.include_histograms else []
+    for column in histogram_columns:
         values = numeric[column].dropna()
         if len(values) > MAX_CHART_POINTS:
             values = values.sample(MAX_CHART_POINTS, random_state=42)
@@ -112,6 +128,32 @@ def analyze(request: DescriptiveRequest) -> tuple[dict, list[str]]:
     if not summary:
         warnings.append("Não há colunas numéricas na seleção atual.")
 
+    interpretation: list[str] = []
+    if {"mean", "std", "variance"} & requested_metrics:
+        interpretation.append(
+            "A média resume o valor central; desvio padrão e variância descrevem "
+            "o afastamento dos valores em relação a ela."
+        )
+    if {"median", "mode"} & requested_metrics:
+        interpretation.append(
+            "A mediana representa o ponto central após a ordenação, enquanto a moda "
+            "é o valor observado com maior frequência."
+        )
+    if "outliers" in requested_metrics:
+        interpretation.append(
+            "Valores discrepantes foram sinalizados pela regra do intervalo "
+            "interquartil (1,5 × IQR); eles não foram removidos."
+        )
+    if request.include_correlations and correlations:
+        interpretation.append(
+            "Correlação descreve associação linear e, isoladamente, não demonstra "
+            "causa e efeito."
+        )
+    if not interpretation:
+        interpretation.append(
+            "Os resultados exibem somente as medidas selecionadas para esta execução."
+        )
+
     return (
         {
             "overview": {
@@ -127,11 +169,14 @@ def analyze(request: DescriptiveRequest) -> tuple[dict, list[str]]:
             "missing": missing,
             "correlations": correlations,
             "histograms": histograms,
-            "interpretation": [
-                "A média resume o valor central, enquanto o desvio padrão mostra a dispersão em torno dela.",
-                "Valores discrepantes foram sinalizados pela regra do intervalo interquartil (1,5 × IQR); eles não foram removidos.",
-                "Correlação descreve associação linear e, isoladamente, não demonstra causa e efeito.",
-            ],
+            "settings": {
+                "metrics": request.metrics,
+                "include_histograms": request.include_histograms,
+                "include_correlations": request.include_correlations,
+                "include_missing_chart": request.include_missing_chart,
+                "columns": columns,
+            },
+            "interpretation": interpretation,
         },
         warnings,
     )

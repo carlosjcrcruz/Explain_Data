@@ -26,6 +26,18 @@ Arquivos tabulares não precisam possuir uma variável alvo para serem enviados 
 
 As regras são aplicadas na ordem e não sobrescrevem uma classificação anterior. O resultado é um novo dataset em memória; o upload original continua disponível e inalterado. Esta etapa não classifica automaticamente nem atribui significado aos registros sem regras explícitas do usuário.
 
+### Página de estatística descritiva
+
+Ao selecionar a estratégia descritiva, o usuário é direcionado para \`/descriptive\` com o identificador do dataset ativo. A página:
+
+- apresenta todas as colunas e os tipos identificados no arquivo;
+- permite selecionar as colunas que serão analisadas;
+- permite combinar contagem, ausências, valores únicos, média, mediana, moda, desvio padrão, variância, extremos, quartis e discrepantes;
+- retorna somente as métricas escolhidas;
+- permite ativar ou desativar histogramas, correlação e gráfico de ausências;
+- usa fundo escuro e textos brancos nos gráficos para preservar a legibilidade;
+- permite voltar à tela principal e recarregar o dataset ainda mantido em memória.
+
 ## Executar
 
 Requer Python 3.11 ou superior.
@@ -53,5 +65,4 @@ pytest -q
 - Respostas de erro não expõem stack traces nem caminhos locais.
 - A API revalida colunas, intervalos, tipos e parâmetros.
 - Gráficos com séries grandes usam amostra ou redução declarada; métricas continuam usando o conjunto filtrado completo.
-
 

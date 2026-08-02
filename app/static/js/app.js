@@ -115,6 +115,7 @@
       state.dataset = response.data;
       state.originalDataset = response.data;
       state.classificationRules = [];
+      sessionStorage.setItem("activeDatasetId", response.data.dataset_id);
       renderDataset();
       renderFields();
       if (response.warnings.length) showAlerts("warning", response.warnings);
@@ -409,7 +410,21 @@
     };
   }
 
+  function openDescriptiveAnalysis() {
+    const datasetId = state.dataset?.dataset_id || sessionStorage.getItem("activeDatasetId");
+    if (datasetId) {
+      sessionStorage.setItem("activeDatasetId", datasetId);
+    }
+    window.location.assign(datasetId
+      ? "/descriptive?dataset_id=" + encodeURIComponent(datasetId)
+      : "/descriptive");
+  }
+
   function activateAnalysis(analysis) {
+    if (analysis === "descriptive") {
+      openDescriptiveAnalysis();
+      return;
+    }
     if (state.analysis !== analysis) state.result = null;
     state.analysis = analysis;
     $$(".analysis-card").forEach((item) => {
@@ -554,21 +569,57 @@
     if (data.correlations.length) plotCorrelation(data.correlations);
   }
 
+  function blueChartLayout(title, xTitle, yTitle, options = {}) {
+    const { margin, xaxis = {}, yaxis = {}, legend = {}, ...extra } = options;
+    return {
+      title: { text: title, x: .01, xanchor: "left", font: { color: "#2563eb", size: 15 } },
+      margin: margin || { t: 65, r: 25, b: 70, l: 65 },
+      paper_bgcolor: "#ffffff",
+      plot_bgcolor: "#ffffff",
+      font: { color: "#2563eb" },
+      hoverlabel: { bgcolor: "#ffffff", bordercolor: "#2563eb", font: { color: "#2563eb" } },
+      modebar: { bgcolor: "#ffffff", color: "#2563eb", activecolor: "#1d4ed8" },
+      ...extra,
+      xaxis: {
+        title: { text: xTitle || "", font: { color: "#2563eb" } },
+        color: "#2563eb",
+        tickfont: { color: "#2563eb" },
+        gridcolor: "#dbeafe",
+        zerolinecolor: "#93c5fd",
+        ...xaxis,
+      },
+      yaxis: {
+        title: { text: yTitle || "", font: { color: "#2563eb" } },
+        color: "#2563eb",
+        tickfont: { color: "#2563eb" },
+        gridcolor: "#dbeafe",
+        zerolinecolor: "#93c5fd",
+        ...yaxis,
+      },
+      legend: { font: { color: "#2563eb" }, ...legend },
+    };
+  }
+
   function plotMissing(rows) {
-    Plotly.newPlot("missing-chart", [{ x: rows.map((r) => r.column), y: rows.map((r) => r.percentage), type: "bar", marker: { color: "#2563eb" }, hovertemplate: "%{x}: %{y:.1f}%<extra></extra>" }], {
-      title: { text: "Valores ausentes por coluna", x: .01, xanchor: "left", font: { size: 15 } }, margin: { t: 55, r: 20, b: 80, l: 55 }, yaxis: { title: "% ausente", rangemode: "tozero", gridcolor: "#e5e7eb" }, xaxis: { gridcolor: "#e5e7eb" }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff",
-    }, { responsive: true, displaylogo: false });
+    Plotly.newPlot("missing-chart", [{ x: rows.map((r) => r.column), y: rows.map((r) => r.percentage), type: "bar", marker: { color: "#2563eb", line: { color: "#1d4ed8", width: 1 } }, hovertemplate: "%{x}: %{y:.1f}%<extra></extra>" }], blueChartLayout(
+      "Valores ausentes por coluna", "Coluna", "% ausente", { margin: { t: 55, r: 20, b: 80, l: 55 }, yaxis: { rangemode: "tozero" } }
+    ), { responsive: true, displaylogo: false });
   }
   function plotDistributions(items) {
     if (!items.length) return;
-    const traces = items.map((item, index) => ({ x: item.x, y: item.y, type: "bar", name: item.column, visible: index === 0, marker: { color: "#2563eb" } }));
-    const buttons = items.map((item, index) => ({ label: item.column, method: "update", args: [{ visible: items.map((_, i) => i === index) }, { title: `Distribuição de ${item.column}` }] }));
-    Plotly.newPlot("distribution-chart", traces, { title: { text: `Distribuição de ${items[0].column}`, x: .01, xanchor: "left", font: { size: 15 } }, updatemenus: [{ buttons, direction: "down", x: 0, y: 1.18 }], margin: { t: 75, r: 20, b: 60, l: 55 }, xaxis: { title: "Faixa de valor", gridcolor: "#e5e7eb" }, yaxis: { title: "Quantidade", gridcolor: "#e5e7eb" }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+    const traces = items.map((item, index) => ({ x: item.x, y: item.y, type: "bar", name: item.column, visible: index === 0, marker: { color: "#2563eb", line: { color: "#1d4ed8", width: 1 } } }));
+    const buttons = items.map((item, index) => ({ label: item.column, method: "update", args: [{ visible: items.map((_, i) => i === index) }, { title: { text: `Distribuição de ${item.column}`, font: { color: "#2563eb", size: 15 } } }] }));
+    Plotly.newPlot("distribution-chart", traces, blueChartLayout(
+      `Distribuição de ${items[0].column}`, "Faixa de valor", "Quantidade",
+      { margin: { t: 75, r: 20, b: 60, l: 55 }, updatemenus: [{ buttons, direction: "down", x: 0, y: 1.18, bgcolor: "#ffffff", bordercolor: "#2563eb", font: { color: "#2563eb" } }] }
+    ), { responsive: true, displaylogo: false });
   }
   function plotCorrelation(rows) {
     const names = rows.map((r) => r.column);
     const z = rows.map((r) => names.map((name) => r[name]));
-    Plotly.newPlot("correlation-chart", [{ z, x: names, y: names, type: "heatmap", colorscale: [[0, "#0b0d10"], [.5, "#ffffff"], [1, "#2563eb"]], zmin: -1, zmax: 1, hovertemplate: "%{x} × %{y}: %{z:.2f}<extra></extra>" }], { title: { text: "Correlação entre variáveis numéricas", x: .01, xanchor: "left", font: { size: 15 } }, margin: { t: 55, r: 25, b: 75, l: 90 }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+    Plotly.newPlot("correlation-chart", [{ z, x: names, y: names, type: "heatmap", colorscale: [[0, "#ffffff"], [.5, "#93c5fd"], [1, "#2563eb"]], zmin: -1, zmax: 1, colorbar: { tickfont: { color: "#2563eb" }, title: { text: "Correlação", font: { color: "#2563eb" } } }, hovertemplate: "%{x} × %{y}: %{z:.2f}<extra></extra>" }], blueChartLayout(
+      "Correlação entre variáveis numéricas", "Variável", "Variável", { margin: { t: 55, r: 25, b: 75, l: 90 } }
+    ), { responsive: true, displaylogo: false });
   }
 
   function renderTimeSeries(data, warnings) {
@@ -587,10 +638,13 @@
     const traces = [
       { x: series.map((r) => r.date), y: series.map((r) => r.value), name: "Valor", mode: "lines", line: { color: "#2563eb", width: 3 } },
       { x: series.map((r) => r.date), y: series.map((r) => r.rolling), name: "Média móvel", mode: "lines", line: { color: "#60a5fa", width: 2 } },
-      { x: series.map((r) => r.date), y: series.map((r) => r.trend), name: "Tendência", mode: "lines", line: { color: "#0b0d10", dash: "dot" } },
+      { x: series.map((r) => r.date), y: series.map((r) => r.trend), name: "Tendência", mode: "lines", line: { color: "#1d4ed8", dash: "dot" } },
     ];
-    if (data.forecast.length) traces.push({ x: data.forecast.map((r) => r.date), y: data.forecast.map((r) => r.value), name: "Previsão linear", mode: "lines+markers", line: { color: "#1d4ed8", dash: "dash" } });
-    Plotly.newPlot("time-chart", traces, { title: { text: `${data.settings.frequency} · ${m.observations} pontos`, x: .01, xanchor: "left", font: { size: 15 } }, margin: { t: 65, r: 20, b: 70, l: 60 }, xaxis: { title: "Tempo", rangeslider: { visible: true }, gridcolor: "#e5e7eb" }, yaxis: { title: "Valor", gridcolor: "#e5e7eb" }, legend: { orientation: "h", y: 1.12 }, hovermode: "x unified", font: { color: "#4b5563" }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+    if (data.forecast.length) traces.push({ x: data.forecast.map((r) => r.date), y: data.forecast.map((r) => r.value), name: "Previsão linear", mode: "lines+markers", line: { color: "#1e40af", dash: "dash" }, marker: { color: "#2563eb" } });
+    Plotly.newPlot("time-chart", traces, blueChartLayout(
+      `${data.settings.frequency} · ${m.observations} pontos`, "Tempo", "Valor",
+      { margin: { t: 65, r: 20, b: 70, l: 60 }, xaxis: { rangeslider: { visible: true, bgcolor: "#ffffff", bordercolor: "#2563eb" } }, legend: { orientation: "h", y: 1.12 }, hovermode: "x unified" }
+    ), { responsive: true, displaylogo: false });
   }
 
   function renderSupervised(data, warnings) {
@@ -605,9 +659,13 @@
     html += interpretationSection(data.interpretation) + warningCards(warnings);
     $("#result-content").innerHTML = html;
     if (classification) {
-      Plotly.newPlot("model-chart", [{ z: data.chart.values, x: data.chart.labels, y: data.chart.labels, type: "heatmap", colorscale: [[0, "#ffffff"], [1, "#2563eb"]], text: data.chart.values, texttemplate: "%{text}", hovertemplate: "Real: %{y}<br>Previsto: %{x}<br>Casos: %{z}<extra></extra>" }], { title: { text: "Matriz de confusão no conjunto de teste", x: .01, xanchor: "left", font: { size: 15 } }, margin: { t: 55, r: 25, b: 70, l: 85 }, xaxis: { title: "Classe prevista" }, yaxis: { title: "Classe real" }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+      Plotly.newPlot("model-chart", [{ z: data.chart.values, x: data.chart.labels, y: data.chart.labels, type: "heatmap", colorscale: [[0, "#ffffff"], [1, "#93c5fd"]], text: data.chart.values, texttemplate: "%{text}", textfont: { color: "#2563eb" }, colorbar: { tickfont: { color: "#2563eb" }, title: { text: "Casos", font: { color: "#2563eb" } } }, hovertemplate: "Real: %{y}<br>Previsto: %{x}<br>Casos: %{z}<extra></extra>" }], blueChartLayout(
+        "Matriz de confusão no conjunto de teste", "Classe prevista", "Classe real", { margin: { t: 55, r: 25, b: 70, l: 85 } }
+      ), { responsive: true, displaylogo: false });
     } else {
-      Plotly.newPlot("model-chart", [{ x: data.chart.actual, y: data.chart.predicted, mode: "markers", marker: { color: "#2563eb", opacity: .7 }, hovertemplate: "Real: %{x}<br>Previsto: %{y}<extra></extra>" }, { x: [Math.min(...data.chart.actual), Math.max(...data.chart.actual)], y: [Math.min(...data.chart.actual), Math.max(...data.chart.actual)], mode: "lines", line: { dash: "dot", color: "#0b0d10" }, name: "Referência ideal" }], { title: { text: "Valores reais e previstos no conjunto de teste", x: .01, xanchor: "left", font: { size: 15 } }, margin: { t: 55, r: 25, b: 60, l: 60 }, xaxis: { title: "Valor real", gridcolor: "#e5e7eb" }, yaxis: { title: "Valor previsto", gridcolor: "#e5e7eb" }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+      Plotly.newPlot("model-chart", [{ x: data.chart.actual, y: data.chart.predicted, mode: "markers", marker: { color: "#2563eb", line: { color: "#1d4ed8", width: 1 }, opacity: .8 }, hovertemplate: "Real: %{x}<br>Previsto: %{y}<extra></extra>" }, { x: [Math.min(...data.chart.actual), Math.max(...data.chart.actual)], y: [Math.min(...data.chart.actual), Math.max(...data.chart.actual)], mode: "lines", line: { dash: "dot", color: "#60a5fa" }, name: "Referência ideal" }], blueChartLayout(
+        "Valores reais e previstos no conjunto de teste", "Valor real", "Valor previsto", { margin: { t: 55, r: 25, b: 60, l: 60 } }
+      ), { responsive: true, displaylogo: false });
     }
   }
 
@@ -630,7 +688,10 @@
       const points = data.points.filter((point) => point.group === group);
       return { x: points.map((point) => point.x), y: points.map((point) => point.y), name: group, mode: "markers", marker: { size: 8, opacity: .72 }, hovertemplate: `${group}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>` };
     });
-    Plotly.newPlot("cluster-chart", traces, { title: { text: `Grupos projetados em duas dimensões · ${m.observations} registros`, x: .01, xanchor: "left", font: { size: 15 } }, colorway: ["#2563eb", "#0b0d10", "#60a5fa", "#64748b", "#1d4ed8", "#94a3b8"], margin: { t: 65, r: 25, b: 60, l: 60 }, xaxis: { title: "Componente principal 1", gridcolor: "#e5e7eb" }, yaxis: { title: "Componente principal 2", gridcolor: "#e5e7eb" }, legend: { orientation: "h", y: 1.12 }, font: { color: "#4b5563" }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff" }, { responsive: true, displaylogo: false });
+    Plotly.newPlot("cluster-chart", traces, blueChartLayout(
+      `Grupos projetados em duas dimensões · ${m.observations} registros`, "Componente principal 1", "Componente principal 2",
+      { colorway: ["#2563eb", "#1d4ed8", "#60a5fa", "#1e40af", "#93c5fd", "#3b82f6"], margin: { t: 65, r: 25, b: 60, l: 60 }, legend: { orientation: "h", y: 1.12 } }
+    ), { responsive: true, displaylogo: false });
   }
 
   function resetDataset() {
@@ -639,6 +700,7 @@
     state.filters = [];
     state.classificationRules = [];
     state.originalDataset = null;
+    sessionStorage.removeItem("activeDatasetId");
     fileInput.value = "";
     clearAlerts();
     dropzone.classList.remove("hidden");
@@ -661,6 +723,10 @@
     setStep(Number(item.dataset.navStep));
   }));
   $$("[data-nav-analysis]").forEach((item) => item.addEventListener("click", () => {
+    if (item.dataset.navAnalysis === "descriptive") {
+      openDescriptiveAnalysis();
+      return;
+    }
     if (!state.dataset) {
       showAlerts("warning", "Envie um arquivo CSV antes de selecionar uma análise.");
       setStep(1);
@@ -712,6 +778,7 @@
       });
       state.dataset = response.data;
       state.result = null;
+      sessionStorage.setItem("activeDatasetId", response.data.dataset_id);
       renderDataset();
       renderFields();
       renderClassificationRules();
@@ -732,4 +799,24 @@
     const csv = "mes,receita,custos,canal\\n2026-01-01,68000,41000,Online\\n2026-02-01,72000,43500,Parceiros\\n2026-03-01,76500,44800,Online\\n2026-04-01,80300,46200,Loja\\n2026-05-01,89200,48900,Online\\n2026-06-01,96400,51200,Parceiros\\n2026-07-01,101500,53400,Online\\n2026-08-01,108900,55700,Loja\\n2026-09-01,114300,57600,Online\\n2026-10-01,121000,60100,Parceiros\\n2026-11-01,129800,62600,Online\\n2026-12-01,138400,65500,Loja";
     uploadFile(new File([csv], "exemplo_receita.csv", { type: "text/csv" }));
   });
+
+  async function restoreDatasetFromLocation() {
+    const params = new URLSearchParams(window.location.search);
+    const identifier = params.get("dataset_id") || sessionStorage.getItem("activeDatasetId");
+    if (!identifier || state.dataset) return;
+    try {
+      const response = await api("/api/datasets/" + encodeURIComponent(identifier));
+      state.dataset = response.data;
+      state.originalDataset = response.data;
+      sessionStorage.setItem("activeDatasetId", identifier);
+      renderDataset();
+      renderFields();
+      setStep(2);
+    } catch (error) {
+      sessionStorage.removeItem("activeDatasetId");
+      showAlerts("warning", error.message);
+    }
+  }
+
+  restoreDatasetFromLocation();
 })();

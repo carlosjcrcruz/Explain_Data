@@ -23,12 +23,19 @@ def upload_csv(dataframe: pd.DataFrame, name: str = "dados.csv") -> str:
 
 def test_homepage_and_static_assets_are_served() -> None:
     page = client.get("/")
+    descriptive_page = client.get("/descriptive")
     css = client.get("/static/css/styles.css")
     javascript = client.get("/static/js/app.js")
+    descriptive_javascript = client.get("/static/js/descriptive.js")
     assert page.status_code == 200
     assert "Explica Dados" in page.text
     assert 'class="sidebar"' in page.text
     assert "Enviar arquivo CSV" in page.text
+    assert descriptive_page.status_code == 200
+    assert "Configurar análise descritiva" in descriptive_page.text
+    assert "Média" in descriptive_page.text
+    assert descriptive_javascript.status_code == 200
+    assert "#ffffff" in descriptive_javascript.text
     assert css.status_code == 200
     assert "--color-primary: #2563eb" in css.text
     assert "--purple" not in css.text
@@ -95,6 +102,50 @@ def test_descriptive_statistics_and_filter() -> None:
     assert body["overview"]["rows_analyzed"] == 4
     assert body["numeric_summary"][0]["mean"] == 2.5
     assert body["numeric_summary"][0]["median"] == 2.5
+
+
+def test_dataset_metadata_can_be_reloaded_for_dedicated_pages() -> None:
+    identifier = upload_csv(pd.DataFrame({"valor": [1, 2], "grupo": ["A", "B"]}))
+    response = client.get(f"/api/datasets/{identifier}")
+    assert response.status_code == 200
+    assert response.json()["data"]["dataset_id"] == identifier
+    assert response.json()["data"]["columns_count"] == 2
+
+
+def test_descriptive_returns_only_selected_metrics_and_charts() -> None:
+    identifier = upload_csv(
+        pd.DataFrame({"valor": [1, 2, 2, 5], "grupo": ["A", "A", "B", "B"]})
+    )
+    response = client.post(
+        "/api/analyses/descriptive",
+        json={
+            "dataset_id": identifier,
+            "columns": ["valor", "grupo"],
+            "metrics": ["mean", "mode"],
+            "include_histograms": False,
+            "include_correlations": False,
+            "include_missing_chart": False,
+        },
+    )
+    data = response.json()["data"]
+    assert response.status_code == 200
+    assert set(data["numeric_summary"][0]) == {"column", "mean", "mode"}
+    assert data["numeric_summary"][0]["mean"] == 2.5
+    assert data["numeric_summary"][0]["mode"] == 2
+    assert set(data["categorical_summary"][0]) == {"column", "mode", "top_values"}
+    assert data["histograms"] == []
+    assert data["correlations"] == []
+    assert data["settings"]["metrics"] == ["mean", "mode"]
+
+
+def test_descriptive_requires_at_least_one_metric() -> None:
+    identifier = upload_csv(pd.DataFrame({"valor": [1, 2, 3]}))
+    response = client.post(
+        "/api/analyses/descriptive",
+        json={"dataset_id": identifier, "columns": ["valor"], "metrics": []},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_PARAMETERS"
 
 
 def test_classification_creates_derived_dataset_and_preserves_original() -> None:
